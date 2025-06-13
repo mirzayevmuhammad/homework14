@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
-
 @Injectable()
 export default class RedisService {
-  private duration: number = 60;
   public redis: Redis;
+  private duration: number = 60;
   constructor() {
     this.redis = new Redis({
       port: +(process.env.REDIS_PORT as string),
@@ -13,12 +12,13 @@ export default class RedisService {
     this.redis.on('connect', () => {
       console.log('Redis connected');
     });
-    this.redis.off('error', (error) => {
-      console.log('redis connecting error');
+    this.redis.on('error', (err) => {
+      console.log('Redis connecting error');
       this.redis.quit();
+      process.exit(1);
     });
   }
-  async setOtp(phone_number: string, otp: string) {
+  async setOtp(phone_number: string, otp: string): Promise<string> {
     const key = `user:${phone_number}`;
     const result = await this.redis.setex(key, this.duration, otp);
     return result;
@@ -31,8 +31,15 @@ export default class RedisService {
     const ttl = await this.redis.ttl(key);
     return ttl;
   }
-
   async delKey(key: string) {
     await this.redis.del(key);
+  }
+
+  async setSessionTokenUser(phone_number: string, token: string) {
+    await this.redis.setex(`session_token:${phone_number}`, 300, token);
+  }
+
+  async getKey(key: string) {
+    return await this.redis.get(key);
   }
 }
